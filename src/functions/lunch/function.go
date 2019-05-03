@@ -60,7 +60,7 @@ func Lunch(w http.ResponseWriter, r *http.Request) {
 	default:
 		e := "Invalid SubCommand."
 		log.Println(e)
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusNotImplemented)
 		w.Write([]byte(e))
 		return
 	}
