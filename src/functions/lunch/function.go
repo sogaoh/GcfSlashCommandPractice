@@ -70,6 +70,7 @@ func Lunch(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(p.Value))
+		return
 
 	case "list":
 		list, err := list()
@@ -80,6 +81,7 @@ func Lunch(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(sprint(list)))
+		return
 
 	default:
 		e := "Invalid SubCommand."
