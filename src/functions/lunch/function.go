@@ -1,17 +1,28 @@
 package lunch
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
+
+	"cloud.google.com/go/datastore" // Datastore を利用できるようにする
 )
 
 type Parameter struct {
 	SubCommand string
 	Value      string
+}
+
+type Restaurant struct {
+	ID        int64     `datastore:"-"`
+	Name      string    `datastore:"name"`
+	Created   time.Time `datastore:"created"`
 }
 
 func Lunch(w http.ResponseWriter, r *http.Request) {
@@ -52,10 +63,23 @@ func Lunch(w http.ResponseWriter, r *http.Request) {
 
 	switch p.SubCommand {
 	case "add":
-		//TODO add の処理を追加
+		if err := add(p.Value); err != nil {
+			log.Printf("DatastorePutError: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(p.Value))
 
 	case "list":
-		//TODO list の処理を追加
+		list, err := list()
+		if err != nil {
+			log.Printf("DatastoreGetAllError: %v\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(sprint(list)))
 
 	default:
 		e := "Invalid SubCommand."
@@ -84,4 +108,49 @@ func (p *Parameter) parse(text string) {
 	}
 
 	p.Value = s[1]
+}
+
+
+func add(value string) error {
+	ctx := context.Background()
+	client, err := datastore.NewClient(ctx, os.Getenv("PROJECT_NAME"))
+	if err != nil {
+		return err
+	}
+	newKey := datastore.IncompleteKey("Restaurant", nil)
+	r := Restaurant{
+		Name:    value,
+		Created: time.Now(),
+	}
+	if _, err := client.Put(ctx, newKey, &r); err != nil {
+		return err
+	}
+	return nil
+}
+
+
+func list() ([]Restaurant, error) {
+	ctx := context.Background()
+	client, err := datastore.NewClient(ctx, os.Getenv("PROJECT_NAME"))
+	if err != nil {
+		return nil, err
+	}
+	var r []Restaurant
+	q := datastore.NewQuery("Restaurant").Order("-created").Limit(5)
+	keys, err := client.GetAll(ctx, q, &r)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(r); i++ {
+		r[i].ID = keys[i].ID
+	}
+	return r, nil
+}
+
+
+func sprint(list []Restaurant) (s string) {
+	for _, r := range list {
+		s = s + fmt.Sprintf("[%v] %v\n", r.ID, r.Name)
+	}
+	return s
 }
